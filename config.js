@@ -1,7 +1,15 @@
 module.exports = {
-    ownerName: "Rahul Debnath", // তোমার নাম
-    botName: "Rahul-MD",        // বটের নতুন নাম এখানে সেট করলাম
-    ownerNumber: ["919547261290"], // তোমার নিজের নম্বর এখানে দাও
+    // তোমার সেশন আইডি এখানে বসাবে (যা তুমি সেশন জেনারেটর থেকে পাবে)
+    sessionID: process.env.SESSION_ID || "RAHUL-MD;;;YOUR_SESSION_HERE", 
+    
+    ownerName: "Rahul Debnath", 
+    botName: "Rahul-MD",        
+    ownerNumber: ["919547261290"], 
     prefix: ".",
-    footer: "Powered by Rahul-MD"
+    footer: "Powered by Rahul-MD",
+    
+    // অ্যাডভান্সড সেটিংস
+    region: "India",
+    public: true, // বট কি সবাই ব্যবহার করতে পারবে? (true/false)
+    mode: "public"
 };
