@@ -2,35 +2,29 @@ const {
     makeWASocket, 
     useMultiFileAuthState, 
     DisconnectReason,
-    fetchLatestBaileysVersion
+    fetchLatestBaileysVersion,
+    makeCacheableSignalKeyStore
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
-const path = require('path');
 const fs = require('fs');
 const config = require('./config');
 
-// প্লাগইনগুলো জমা রাখার জন্য একটি অবজেক্ট
-const plugins = new Map();
-
-// প্লাগইন লোড করার ফাংশন
-function loadPlugins() {
-    const pluginFolder = path.join(__dirname, 'plugins');
-    const pluginFiles = fs.readdirSync(pluginFolder).filter(file => file.endsWith('.js'));
-
-    for (const file of pluginFiles) {
-        const plugin = require(path.join(pluginFolder, file));
-        plugins.set(plugin.name, plugin);
-        console.log(`✅ প্লাগইন লোড হয়েছে: ${file}`);
-    }
-}
-
 async function startRahulMD() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
-    const { version } = await fetchLatestBaileysVersion();
+    
+    // সেশন আইডি থেকে লগইন ডাটা রিকভার করা
+    if (config.sessionID && config.sessionID.includes("RAHUL-MD;;;")) {
+        const sessionData = config.sessionID.split("RAHUL-MD;;;")[1];
+        const creds = JSON.parse(Buffer.from(sessionData, "base64").toString());
+        fs.writeFileSync("./auth_info/creds.json", JSON.stringify(creds, null, 2));
+        console.log("✅ সেশন আইডি লোড হয়েছে!");
+    }
 
     const sock = makeWASocket({
-        version,
-        auth: state,
+        auth: {
+            creds: state.creds,
+            keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" })),
+        },
         printQRInTerminal: true,
         logger: pino({ level: 'silent' }),
         browser: [config.botName, "Chrome", "1.0.0"]
@@ -45,6 +39,7 @@ async function startRahulMD() {
             if (shouldReconnect) startRahulMD();
         } else if (connection === 'open') {
             console.log(`🚀 ${config.botName} অনলাইনে আছে!`);
+            sock.sendMessage(sock.user.id, { text: `*Rahul-MD সফলভাবে কানেক্ট হয়েছে!* ✅\n\nওনার: ${config.ownerName}` });
         }
     });
 
@@ -52,29 +47,14 @@ async function startRahulMD() {
         const msg = m.messages[0];
         if (!msg.message || msg.key.fromMe) return;
 
-        const from = msg.key.remoteJid;
         const body = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
-        
-        if (!body.startsWith(config.prefix)) return;
-
-        const args = body.slice(config.prefix.length).trim().split(/ +/);
-        const commandName = args.shift().toLowerCase();
-
-        // প্লাগইন খুঁজে বের করা (নাম বা অ্যালিয়াস দিয়ে)
-        const plugin = [...plugins.values()].find(p => p.name === commandName || (p.alias && p.alias.includes(commandName)));
-
-        if (plugin) {
-            try {
-                await plugin.execute(sock, msg, args);
-            } catch (error) {
-                console.error(error);
-                await sock.sendMessage(from, { text: "❌ এই কমান্ডটি কাজ করছে না।" });
+        if (body.startsWith(config.prefix)) {
+            const command = body.slice(config.prefix.length).trim().toLowerCase();
+            if (command === 'ping') {
+                await sock.sendMessage(msg.key.remoteJid, { text: "বট কাজ করছে! 🚀" });
             }
         }
     });
 }
 
-// প্লাগইন লোড করে বট স্টার্ট করা
-loadPlugins();
 startRahulMD();
-
